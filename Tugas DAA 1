@@ -1,2 +1,111 @@
-Algoritma segiti 
+Soal 1 
+
+step 1 mendeklarasikan variabel x , y , z dan a
+step 2 variabel x bernilai 3, variabel y bernilai 4 , z bernilai 1  dan a bernilai y * z
+step 3 mencari kelipatan y dengan nilai z 
+step 4 kemudian di moduluskan dengan x
+step 5 buat perulangan dengan kondisi jika hasil dari modulusnya bukan sama dengan 0 maka perulangan masih berlanjut dengan z bertambah satu
+step 6 jika hasil dari modulus sama dengan 0 maka tampilkan hasil dari a
+
+x = 3
+y = 4 
+z = 1
+a= y * z
+
+while a%x !=0 do
+a= y * z 
+z= z + 1
+
+print (a)
+
+soal 2 
+step 1 siapkan 3 variabel
+step 2 variabel 1 bernilai pisang
+step 3 variabel 2 bernilai manggis
+step 4 variabel 3 bernilai wadah kosong
+step 4 variabel 1 dipindahkan ke variabel 3
+step 5 variabel 2 dipindahkan ke variabel 1
+step 6 variabel 3 dipindahkan ke variabel 2
+
+pseudocode
+piring 1 = pisang
+piring 2 = manggis 
+piring 3 = ""
+
+piring 3 = piring 1
+piring 1 = piring 2 
+piring 2 = piring 3
+
+print (piring 1, piring 2)
+
+soal 3
+
+algoritma
+step 1 mendeklarasikan alas, tinggi dan luas 
+step 2 variabel alas bernilai 25 , tinggi bernilai 30  
+step 3 menghitung luas bernilai alas dikali tinggi dibagi 2
+step 3 tampilkan hasil dari luas 
+
+pseudocode
+
+alas = 25
+tinggi = 30
+
+luas = alas*tinggi*1/2
+
+print (luas)
+
+soal 4 
+
+algoritma 
+step 1 mendeklarasikan panjang, tinggi
+step 2 variabel panjang bernilai 5 dan tinggi bernilai 3 
+step 3 menghitung luas bernilai panjang dikali tinggi 
+step 4 tampilkan hasil dari luas
+
+pseudocode
+
+panjang = 5 
+tinggi = 3 
+
+luas = panjang * tinggi 
+
+print (luas) 
+
+soal 5
+algoritma 
+step 1 mendeklarasikan jari-jari, phi dan tinggi
+step 2 variabel jari-jari bernilai 3 , phi bernilai 3,14 dan tinggi bernilai 5
+step 3 menghitung volume bernilai phi dikali jari-jari dikali jari-jari dikali tinggi
+step 4 tampilkan hasil dari volume
+
+pseudocode
+
+jari-jari = 3
+phi = 3.14
+tinggi = 5
+
+volume = phi * jari-jari * jari-jari * tinggi
+
+print (volume)
+
+soal 6
+ algoritma 
+ step 1 mendeklarasikan jari-jari, phi , tinggi dan diameter
+ step 2 variabel diameter bernilai 5 , phi bernilai 3,14 dan tinggi bernilai 4
+ step 3 menghitung jari-jari bernilai diameter dikali setengah
+ step 4 menghitung volume bernilai 1/3 dikali phi dikali jari-jari dikali jari-jari dikali tinggi
+ step 5 tampilkan hasil dari volume
+
+pseudocode
+diameter = 5
+phi = 3,14
+tinggi = 4
+ 
+jari-jari = diameter * 1/2
+
+volume = 1/3 * phi * jari-jari * jari-jari * tinggi
+
+print (volume)
+
 
