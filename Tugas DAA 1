@@ -10,11 +10,11 @@ step 6 jika hasil dari modulus sama dengan 0 maka tampilkan hasil dari a
 x = 3
 y = 4 
 z = 1
-a= y * z
+a = y * z
 
 while a%x !=0 do
-a= y * z 
-z= z + 1
+a = y * z 
+z = z + 1
 
 print (a)
 
