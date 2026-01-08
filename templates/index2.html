@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rumah Jogja Monitor - Smart Home Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <span class="brand-icon">🏠</span>
+                <h1>Rumah Jogja Monitor</h1>
+            </div>
+            <div class="navbar-clock">
+                <div class="clock" id="realtime-clock">00:00:00</div>
+            </div>
+            <div class="navbar-mode">
+                <button id="mode-btn" class="mode-btn empty">Mode: Kosong</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Status Overview & Energy Monitor -->
+        <div class="summary-section">
+            <!-- Status Overview -->
+            <div class="status-card">
+                <h2>Ringkasan Status</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="status-label">Lampu Menyala</span>
+                        <span class="status-value" id="lights-on">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Perangkat Aktif</span>
+                        <span class="status-value" id="devices-active">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Status Rumah</span>
+                        <span class="status-value" id="house-status">Kosong</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Notifications -->
+        <div class="notifications-section">
+            <h2>Notifikasi</h2>
+            <div class="notifications-container" id="notifications">
+                <p class="empty-state">Tidak ada notifikasi penting</p>
+            </div>
+        </div>
+        <!-- Control Buttons -->
+        <div class="control-buttons-section">
+            <button id="all-lights-btn" class="control-btn lights-btn" disabled>
+                <span class="btn-icon">💡</span>
+                <span class="btn-text">Matikan Semua Lampu</span>
+            </button>
+            <button id="all-devices-btn" class="control-btn devices-btn" disabled>
+                <span class="btn-icon">⚙️</span>
+                <span class="btn-text">Matikan Semua Perangkat</span>
+            </button>
+        </div>
+
+        <!-- Rooms Grid -->
+        <div class="rooms-section">
+            <h2>Kontrol Ruangan</h2>
+            <div class="rooms-grid" id="rooms-grid">
+                <!-- Akan di-populate oleh JavaScript -->
+            </div>
+        </div>
+
+        <!-- Devices Control -->
+        <div class="devices-section">
+            <h2>Kontrol Perangkat</h2>
+            <div class="devices-grid" id="devices-grid">
+                <!-- Akan di-populated oleh JavaScript -->
+            </div>
+        </div>
+
+        
+
+        <!-- Activity Log -->
+        <div class="logs-section">
+            <h2>Log Aktivitas</h2>
+            <div class="logs-container" id="logs">
+                <p class="empty-state">Belum ada aktivitas</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

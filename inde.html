@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Pemantauan — Rumah Sewaan</title>
+  <meta name="description" content="Dashboard pemantauan rumah sewaan tanpa kamera/mikrofon. Menampilkan occupancy, status lampu, penggunaan mesin cuci & pompa, kontrol aman, serta log dan grafik penggunaan." />
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#f7f9fc; --card:#ffffff; --muted:#6b7280; --accent:#0f172a; --primary:#0b5cff; --danger:#ef4444; --success:#16a34a;
+      --glass: rgba(255,255,255,0.6);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; background:var(--bg); color:var(--accent);}
+    .container{max-width:1200px; margin:30px auto; padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+    header h1{font-size:20px;margin:0}
+    header p{margin:0;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns: 1fr 360px; gap:20px}
+
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(12,16,24,0.06)}
+    .section-title{font-weight:600;margin-bottom:8px}
+
+    /* Rooms list */
+    .rooms{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .room{padding:12px;border-radius:10px;border:1px solid #eef2f6;display:flex;flex-direction:column;gap:8px}
+    .room h3{margin:0;font-size:15px}
+    .status{display:flex;gap:8px;align-items:center;font-weight:600}
+    .badge{padding:6px 8px;border-radius:999px;font-size:13px}
+    .badge.occ{background:rgba(22,163,74,0.12);color:var(--success)}
+    .badge.empty{background:rgba(239,68,68,0.07);color:var(--danger)}
+    .muted{color:var(--muted);font-size:13px}
+
+    /* Appliances */
+    .appliance{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:8px;border:1px solid #eef2f6}
+    .appliance .meta{display:flex;flex-direction:column}
+    .appliance .meta span{font-size:13px;color:var(--muted)}
+    .controls{display:flex;gap:8px}
+    button.btn{background:var(--primary);color:white;border:none;padding:8px 12px;border-radius:8px;font-weight:600;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid #dbeafe;color:var(--primary)}
+    button:disabled{opacity:0.5;cursor:not-allowed}
+
+    /* Right column */
+    .right-col{display:flex;flex-direction:column;gap:12px}
+    .small{font-size:13px;color:var(--muted)}
+    .log{max-height:260px;overflow:auto;margin-top:8px;padding:8px;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid #f1f5f9}
+    .log-item{font-size:13px;padding:8px;border-bottom:1px dashed #eef2f6}
+
+    /* layout responsive */
+    @media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+    /* top controls */
+    .top-controls{display:flex;gap:10px;align-items:center}
+    .pill{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid #eef2f6;font-weight:600}
+
+    footer{margin-top:20px;color:var(--muted);font-size:13px;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Dashboard Pemantauan — Rumah Sewaan</h1>
+        <p>Pemantauan real-time tanpa kamera/mikrofon — keamanan, efisiensi energi, dan privasi</p>
+      </div>
+      <div class="top-controls">
+        <div class="pill">Koneksi: <span id="conn_status">—</span></div>
+        <div class="pill">House ID: <strong id="house_id">1</strong></div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <main>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><div class="section-title">Ringkasan Rumah</div><div class="small">Status occupancy, lampu, dan peralatan</div></div>
+            <div class="muted">Terakhir disinkron: <span id="last_sync">-</span></div>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:12px">
+            <div style="flex:1;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid #eef2f6">
+              <div class="small">Kondisi rumah</div>
+              <div style="font-size:20px;font-weight:700" id="home_state">Kosong</div>
+              <div class="muted">Aturan: OFF appliance hanya aktif bila rumah kosong</div>
+            </div>
+            <div style="width:220px;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid #eef2f6">
+              <div class="small">Total ruangan</div>
+              <div style="font-size:20px;font-weight:700" id="total_rooms">4</div>
+              <div class="muted">(3 kamar + zona appliance)</div>
+            </div>
+          </div>
+
+          <hr style="margin:16px 0;border:none;border-top:1px solid #f1f5f9">
+
+          <div class="section-title">Ruangan</div>
+          <div class="rooms" id="rooms_container">
+            <!-- room cards injected -->
+          </div>
+
+          <hr style="margin:16px 0;border:none;border-top:1px solid #f1f5f9">
+
+          <div class="section-title">Peralatan & Kontrol</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+            <div class="appliance">
+              <div class="meta"><strong>Mesin Cuci</strong><span id="mc_power" class="muted">—</span></div>
+              <div class="controls"><div id="mc_state" class="muted">?</div><button id="mc_off_btn" class="btn">Matikan</button></div>
+            </div>
+            <div class="appliance">
+              <div class="meta"><strong>Pompa Air</strong><span id="pump_power" class="muted">—</span></div>
+              <div class="controls"><div id="pump_state" class="muted">?</div><button id="pump_off_btn" class="btn">Matikan</button></div>
+            </div>
+            <div class="appliance">
+              <div class="meta"><strong>Kontrol Lampu (opsional)</strong><span class="muted">Hanya saran: remote-off nonaktif bila ada penghuni</span></div>
+              <div class="controls"><button id="lights_all_off" class="ghost">Matikan Semua (kosong)</button></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">Grafik Penggunaan (Mesin Cuci / Pompa)</div>
+          <canvas id="usageChart" height="100"></canvas>
+        </div>
+
+      </main>
+
+      <aside class="right-col">
+        <div class="card">
+          <div class="section-title">Notifikasi & Log</div>
+          <div class="small">Notifikasi penting akan muncul di sini (lampu menyala saat kosong, peralatan menyala di luar jadwal, dsb).</div>
+          <div class="log" id="log_container"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Koneksi & Pengaturan</div>
+          <div class="small" style="margin-bottom:8px">Broker MQTT (WebSocket), house_id, dan aturan kontrol</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label class="small">Broker (wss)</label>
+            <input id="input_broker" type="text" value="wss://test.mosquitto.org:8081" style="padding:8px;border-radius:8px;border:1px solid #eef2f6" />
+            <label class="small">House ID</label>
+            <input id="input_house" type="text" value="1" style="padding:8px;border-radius:8px;border:1px solid #eef2f6" />
+            <label class="small">Timeout kosong (detik)</label>
+            <input id="input_empty_timeout" type="number" value="120" style="padding:8px;border-radius:8px;border:1px solid #eef2f6" />
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button id="btn_connect" class="btn">Hubungkan</button>
+              <button id="btn_clear_log" class="ghost">Bersihkan Log</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Panduan Singkat</div>
+          <ol class="small">
+            <li>Set broker WebSocket yang mendukung WSS.</li>
+            <li>Setiap ESP32 mem-publish ke topik: <code>rumah/&lt;id&gt;/kamar/&lt;n&gt;/status</code> serta <code>rumah/&lt;id&gt;/appliance/&lt;nama&gt;/usage</code>.</li>
+            <li>Gunakan retained=true untuk status agar klien baru mendapatkan keadaan terakhir.</li>
+            <li>Jangan gunakan broker publik untuk produksi tanpa autentikasi dan TLS valid.</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="muted">Dibuat untuk tujuan akademis/tesis — rancangan ini mengutamakan privasi dan keamanan.</footer>
+  </div>
+
+<script>
+// ---------- Konfigurasi awal ----------
+let brokerUrl = document.getElementById('input_broker').value.trim();
+let houseId = document.getElementById('input_house').value.trim();
+let emptyTimeoutSec = parseInt(document.getElementById('input_empty_timeout').value,10) || 120;
+
+// topic patterns
+const topicRoomStatus = (hid)=> `rumah/${hid}/kamar/+/status`;
+const topicApplianceUsage = (hid)=> `rumah/${hid}/appliance/+/usage`;
+const topicApplianceControl = (hid,name)=> `rumah/${hid}/appliance/${name}/control`;
+
+let client=null;
+let rooms = {}; // {id: {occupancy:0/1, light:0/1, lastSeen:ts}}
+let appliances = {}; // {name:{state, power, lastSeen}}
+let logs = [];
+let lastSync = null;
+
+// chart setup
+const ctx = document.getElementById('usageChart').getContext('2d');
+const usageChart = new Chart(ctx, {
+  type: 'line',
+  data: {labels: [], datasets: [{label:'Mesin Cuci (W)', data:[], tension:0.3, fill:false},{label:'Pompa (W)', data:[], tension:0.3, fill:false}]},
+  options:{plugins:{legend:{display:true}},scales:{x:{display:true},y:{display:true}}}
+});
+
+function addLog(msg, level='info'){
+  const now = new Date();
+  logs.unshift({t: now.toLocaleString(), msg, level});
+  if (logs.length>200) logs.pop();
+  renderLogs();
+}
+
+function renderLogs(){
+  const el = document.getElementById('log_container');
+  el.innerHTML = '';
+  logs.forEach(l=>{
+    const d = document.createElement('div'); d.className='log-item'; d.textContent = `[${l.t}] ${l.msg}`; el.appendChild(d);
+  });
+}
+
+function setConnStatus(text, color){
+  const s = document.getElementById('conn_status'); s.textContent = text; s.style.color = color||'';
+}
+
+function updateRoomCard(id){
+  const container = document.getElementById('rooms_container');
+  let card = document.getElementById('room_'+id);
+  if (!card){
+    card = document.createElement('div'); card.className='room'; card.id='room_'+id;
+    card.innerHTML = `<h3>Ruangan ${id}</h3><div class="status">Status: <span id="room_${id}_badge" class="badge">—</span></div><div class="muted">Lampu: <span id="room_${id}_light">—</span></div><div class="muted">Terakhir: <span id="room_${id}_seen">—</span></div>`;
+    container.appendChild(card);
+  }
+  const r = rooms[id];
+  const badge = document.getElementById(`room_${id}_badge`);
+  badge.textContent = r.occupancy==1? 'Ada':'Kosong';
+  badge.className = 'badge ' + (r.occupancy==1? 'occ':'empty');
+  document.getElementById(`room_${id}_light`).textContent = r.light==1? 'Menyala':'Mati';
+  document.getElementById(`room_${id}_seen`).textContent = new Date(r.lastSeen).toLocaleTimeString();
+}
+
+function evaluateHouseState(){
+  // house occupied if any room occupancy==1
+  const any = Object.values(rooms).some(r=> r.occupancy==1);
+  document.getElementById('home_state').textContent = any? 'Terisi':'Kosong';
+  document.getElementById('last_sync').textContent = new Date().toLocaleTimeString();
+  // enable/disable controls
+  document.getElementById('mc_off_btn').disabled = any;
+  document.getElementById('pump_off_btn').disabled = any;
+  document.getElementById('lights_all_off').disabled = any;
+  // update appliances area
+  document.getElementById('total_rooms').textContent = Object.keys(rooms).length + ' (incl. zone)';
+}
+
+function onMessage(topic, payload){
+  const s = payload.toString();
+  try{
+    const data = JSON.parse(s);
+    if (topic.includes('/kamar/')){
+      // extract room id
+      const parts = topic.split('/');
+      const rid = parts[3];
+      rooms[rid] = rooms[rid] || {occupancy:0, light:0, lastSeen: Date.now()};
+      rooms[rid].occupancy = data.occupancy||0;
+      rooms[rid].light = data.light||0;
+      rooms[rid].lastSeen = Date.now();
+      updateRoomCard(rid);
+      addLog(`Status kamar ${rid} diperbarui — occupancy:${rooms[rid].occupancy}, light:${rooms[rid].light}`);
+      evaluateHouseState();
+
+      // check rule: lampu menyala saat rumah kosong — send notification
+      setTimeout(()=>{
+        const empty = !Object.values(rooms).some(r=> r.occupancy==1);
+        if (empty && Object.values(rooms).some(r=> r.light==1)){
+          addLog('Peringatan: Terdeteksi lampu menyala saat rumah kosong.', 'warn');
+        }
+      }, 500);
+    }
+    if (topic.includes('/appliance/')){
+      const parts = topic.split('/');
+      const name = parts[3];
+      appliances[name] = appliances[name] || {state:'?', power:0, lastSeen:Date.now()};
+      appliances[name].state = data.state || (data.power>0? 'ON': 'OFF') || appliances[name].state;
+      appliances[name].power = data.power || data.power_w || data.current_w || 0;
+      appliances[name].lastSeen = Date.now();
+      document.getElementById(name+'_state') && (document.getElementById(name+'_state').textContent = appliances[name].state);
+      if (name=='mesin_cuci') document.getElementById('mc_power').textContent = `${appliances[name].power} W`;
+      if (name=='pompa') document.getElementById('pump_power').textContent = `${appliances[name].power} W`;
+      addLog(`Appliance ${name} usage: ${appliances[name].power}W state:${appliances[name].state}`);
+
+      // push into chart
+      const t = new Date().toLocaleTimeString();
+      usageChart.data.labels.push(t);
+      usageChart.data.datasets[0].data.push(name=='mesin_cuci'? appliances[name].power : (usageChart.data.datasets[0].data.slice(-1).pop()||0));
+      usageChart.data.datasets[1].data.push(name=='pompa'? appliances[name].power : (usageChart.data.datasets[1].data.slice(-1).pop()||0));
+      if (usageChart.data.labels.length>20){ usageChart.data.labels.shift(); usageChart.data.datasets.forEach(d=>d.data.shift()); }
+      usageChart.update();
+
+      evaluateHouseState();
+    }
+  }catch(e){
+    console.error('Invalid payload', s);
+  }
+}
+
+// ---------- MQTT connect / reconnect ----------
+function connectClient(){
+  brokerUrl = document.getElementById('input_broker').value.trim();
+  houseId = document.getElementById('input_house').value.trim() || '1';
+  emptyTimeoutSec = parseInt(document.getElementById('input_empty_timeout').value,10) || 120;
+  if (!brokerUrl) return alert('Isikan broker WebSocket (wss://...)');
+  setConnStatus('Menghubungkan...', 'orange');
+
+  if (client) client.end(true);
+  client = mqtt.connect(brokerUrl, {connectTimeout: 4000, reconnectPeriod: 5000});
+
+  client.on('connect', ()=>{
+    setConnStatus('Tersambung', 'green');
+    addLog('Terkoneksi ke broker: '+brokerUrl);
+    client.subscribe(topicRoomStatus(houseId));
+    client.subscribe(topicApplianceUsage(houseId));
+  });
+  client.on('reconnect', ()=> setConnStatus('Mencoba sambung...', 'orange'));
+  client.on('error', err=>{ setConnStatus('Error', 'red'); addLog('MQTT Error: '+err.message,'error'); });
+  client.on('message', (t,p)=> onMessage(t,p));
+}
+
+// ---------- UI event handlers ----------
+document.getElementById('btn_connect').addEventListener('click', ()=> connectClient());
+document.getElementById('btn_clear_log').addEventListener('click', ()=>{ logs=[]; renderLogs(); });
+
+// appliance control
+function publishControl(name, cmd){
+  if (!client || !client.connected) return addLog('Tidak terkoneksi ke broker', 'error');
+  const t = topicApplianceControl(houseId, name);
+  client.publish(t, JSON.stringify({cmd}), {qos:1});
+  addLog(`Perintah ${cmd} dipublikasikan ke ${name}`);
+}
+
+document.getElementById('mc_off_btn').addEventListener('click', ()=> publishControl('mesin_cuci','OFF'));
+document.getElementById('pump_off_btn').addEventListener('click', ()=> publishControl('pompa','OFF'));
+document.getElementById('lights_all_off').addEventListener('click', ()=>{
+  // publish per-room light off commands (if implemented on device)
+  addLog('Permintaan matikan semua lampu (jika tersedia pada perangkat)');
+  // Example: publish to rumah/1/kamar/<n>/control -> {cmd:'LIGHT_OFF'}
+  Object.keys(rooms).forEach(rid=>{ const t = `rumah/${houseId}/kamar/${rid}/control`; client && client.publish(t, JSON.stringify({cmd:'LIGHT_OFF'})); });
+});
+
+// auto-evaluate room last seen to infer stale occupancy
+setInterval(()=>{
+  const now = Date.now();
+  let changed=false;
+  Object.keys(rooms).forEach(k=>{
+    if (rooms[k].occupancy==1 && (now - rooms[k].lastSeen) > emptyTimeoutSec*1000){
+      rooms[k].occupancy = 0; rooms[k].lastSeen = now; addLog(`Kamar ${k} dianggap kosong (timeout).`); updateRoomCard(k); changed=true;
+    }
+  });
+  if (changed) evaluateHouseState();
+}, 5000);
+
+// auto-connect on load (optional)
+// connectClient();
+
+// add initial placeholder rooms
+['1','2','3','zone'].forEach(id=>{ rooms[id] = {occupancy:0, light:0, lastSeen: Date.now()}; updateRoomCard(id); });
+
+</script>
+</body>
+</html>
